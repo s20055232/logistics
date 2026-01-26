@@ -1,0 +1,10 @@
+# Bazel build outputs
+bazel-bin
+bazel-out
+bazel-testlogs
+bazel-logistics
+
+# Secrets - do not commit
+.env
+tls.crt
+tls.key
