@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Location Data Examples</title>
+    <style>
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        max-width: 900px;
+        margin: 40px auto;
+        padding: 20px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+      }
+      .container {
+        background: white;
+        border-radius: 12px;
+        padding: 30px;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+      }
+      h1 {
+        color: #333;
+        border-bottom: 3px solid #667eea;
+        padding-bottom: 15px;
+        margin-bottom: 30px;
+      }
+      .section {
+        margin-bottom: 30px;
+        padding: 20px;
+        background: #f8f9fa;
+        border-radius: 8px;
+        border-left: 4px solid #667eea;
+      }
+      h2 {
+        color: #667eea;
+        margin-top: 0;
+        font-size: 1.3em;
+      }
+      pre {
+        background: #2d3748;
+        color: #e2e8f0;
+        padding: 15px;
+        border-radius: 6px;
+        overflow-x: auto;
+        font-size: 0.9em;
+        line-height: 1.5;
+      }
+      .label {
+        font-weight: 600;
+        color: #555;
+        margin-bottom: 8px;
+      }
+      .highlight {
+        background: #fef3c7;
+        padding: 2px 6px;
+        border-radius: 3px;
+        font-weight: 600;
+      }
+      .info {
+        color: #666;
+        font-size: 0.95em;
+        margin-top: 10px;
+        font-style: italic;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>📍 Location Data Examples</h1>
+
+      <div class="section">
+        <h2>1. Simple Coordinates (Lat/Long)</h2>
+        <div class="label">Most common format - used by GPS:</div>
+        <pre>
+{
+  "latitude": 25.0330,
+  "longitude": 121.5654,
+  "accuracy": 10
+}</pre
+        >
+        <div class="info">These coordinates point to Taipei, Taiwan</div>
+      </div>
+
+      <div class="section">
+        <h2>2. Address Information</h2>
+        <div class="label">Human-readable location:</div>
+        <pre>
+{
+  "street": "123 Zhongxiao East Road",
+  "city": "Taipei",
+  "state": "Taipei City",
+  "country": "Taiwan",
+  "postalCode": "10050"
+}</pre
+        >
+      </div>
+
+      <div class="section">
+        <h2>3. GeoJSON Format</h2>
+        <div class="label">Standard format for geographic data:</div>
+        <pre>
+{
+  "type": "Feature",
+  "geometry": {
+    "type": "Point",
+    "coordinates": [121.5654, 25.0330]
+  },
+  "properties": {
+    "name": "Taipei 101",
+    "category": "landmark"
+  }
+}</pre
+        >
+        <div class="info">Note: GeoJSON uses [longitude, latitude] order!</div>
+      </div>
+
+      <div class="section">
+        <h2>4. Browser Geolocation API</h2>
+        <div class="label">What your browser returns:</div>
+        <pre>
+{
+  "coords": {
+    "latitude": 25.0330,
+    "longitude": 121.5654,
+    "altitude": null,
+    "accuracy": 20,
+    "altitudeAccuracy": null,
+    "heading": null,
+    "speed": null
+  },
+  "timestamp": 1737628800000
+}</pre
+        >
+      </div>
+
+      <div class="section">
+        <h2>5. Google Maps URL</h2>
+        <div class="label">Location as a shareable link:</div>
+        <pre>https://www.google.com/maps?q=<span class="highlight">25.0330,121.5654</span></pre>
+        <div class="info">
+          Click coordinates in Google Maps to get this format
+        </div>
+      </div>
+
+      <div class="section">
+        <h2>6. IP Geolocation Data</h2>
+        <div class="label">Approximate location from IP address:</div>
+        <pre>
+{
+  "ip": "123.456.789.012",
+  "city": "Taipei",
+  "region": "Taipei City",
+  "country": "TW",
+  "loc": "25.0330,121.5654",
+  "timezone": "Asia/Taipei"
+}</pre
+        >
+        <div class="info">Less accurate than GPS, typically city-level</div>
+      </div>
+
+      <div class="section">
+        <h2>7. GPS Track Points</h2>
+        <div class="label">
+          Multiple locations with timestamps (tracking movement):
+        </div>
+        <pre>
+[
+  {
+    "lat": 25.0330,
+    "lon": 121.5654,
+    "timestamp": "2026-01-23T10:00:00Z",
+    "speed": 0
+  },
+  {
+    "lat": 25.0335,
+    "lon": 121.5660,
+    "timestamp": "2026-01-23T10:05:00Z",
+    "speed": 5.2
+  }
+]</pre
+        >
+      </div>
+    </div>
+  </body>
+</html>
