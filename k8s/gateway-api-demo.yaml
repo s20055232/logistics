@@ -1,0 +1,121 @@
+# Gateway API 配置示例 - Kong Admin 服务
+#
+# 前置条件：
+#   1. kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.2.0/standard-install.yaml
+#   2. helm install kong kong/ingress -n kong --set gateway.enabled=true
+
+# ===== 1. GatewayClass =====
+# 告诉 Kubernetes 使用 Kong 作为 Gateway 实现
+apiVersion: gateway.networking.k8s.io/v1
+kind: GatewayClass
+metadata:
+  name: kong
+spec:
+  controllerName: konghq.com/kic-gateway-controller
+
+---
+# ===== 2. Gateway =====
+# 定义入口点：在 80 端口监听 HTTP 请求
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: demo-gateway
+  namespace: kong
+spec:
+  gatewayClassName: kong
+  listeners:
+  - name: http
+    port: 80
+    protocol: HTTP
+    allowedRoutes:
+      namespaces:
+        from: Same
+
+---
+# ===== 3. HTTPRoute（基础路由）=====
+# admin.local 的请求转发到 kong-admin 服务
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: admin-route
+  namespace: kong
+spec:
+  parentRefs:
+  - name: demo-gateway
+  hostnames:
+  - "admin.local"
+  rules:
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /
+    backendRefs:
+    - name: kong-admin
+      port: 8001
+
+---
+# ===== 4. Key Auth 插件 =====
+# 要求请求带有 API Key
+apiVersion: configuration.konghq.com/v1
+kind: KongPlugin
+metadata:
+  name: key-auth
+  namespace: kong
+plugin: key-auth
+
+---
+# ===== 5. Rate Limiting 插件 =====
+# 每分钟最多 10 次请求
+apiVersion: configuration.konghq.com/v1
+kind: KongPlugin
+metadata:
+  name: rate-limit
+  namespace: kong
+plugin: rate-limiting
+config:
+  minute: 10
+  policy: local
+
+---
+# ===== 6. 受保护的 HTTPRoute =====
+# admin-secure.local 需要认证 + 限流
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: admin-route-protected
+  namespace: kong
+  annotations:
+    konghq.com/plugins: key-auth,rate-limit
+spec:
+  parentRefs:
+  - name: demo-gateway
+  hostnames:
+  - "admin-secure.local"
+  rules:
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /
+    backendRefs:
+    - name: kong-admin
+      port: 8001
+
+---
+# ===== 7. Telemetry HTTPRoute =====
+# /track endpoint for GPS data ingestion
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: telemetry-route
+  namespace: kong
+spec:
+  parentRefs:
+  - name: demo-gateway
+  rules:
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /track
+    backendRefs:
+    - name: telemetry
+      port: 80

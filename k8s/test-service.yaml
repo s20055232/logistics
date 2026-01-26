@@ -1,0 +1,48 @@
+# Telemetry Service - GPS data ingestion
+apiVersion: v1
+kind: Service
+metadata:
+  name: telemetry
+  namespace: kong
+spec:
+  ports:
+  - port: 80
+    targetPort: 8080
+  selector:
+    app: telemetry
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: telemetry
+  namespace: kong
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: telemetry
+  template:
+    metadata:
+      labels:
+        app: telemetry
+    spec:
+      containers:
+      - name: telemetry
+        image: telemetry:latest
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 8080
+        env:
+        - name: KAFKA_BROKERS
+          value: "kafka.kafka.svc.cluster.local:9092"
+        - name: KAFKA_TOPIC
+          value: "container.telemetry"
+        - name: LISTEN_ADDR
+          value: ":8080"
+        resources:
+          requests:
+            cpu: 100m
+            memory: 64Mi
+          limits:
+            cpu: 500m
+            memory: 128Mi
