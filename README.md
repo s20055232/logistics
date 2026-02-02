@@ -34,12 +34,9 @@ logistics/
 ├── alert/               # Notification service (Kafka consumer, sends alerts)
 ├── routing/             # Route optimization engine (parallel computing)
 └── k8s/                 # Kubernetes manifests
-    ├── gateway-api-demo.yaml   # Gateway, HTTPRoutes, KongPlugins
     ├── kafka.yaml              # Kafka for K8s (KRaft mode)
-    ├── rate-limit-plugin.yaml  # Global rate limiting (KongClusterPlugin)
-    ├── redis.yaml              # Redis for rate limit counters
-    ├── test-service.yaml       # Telemetry service deployment
-    └── values.yaml             # Kong Helm values
+    ├── redis.yaml              # Redis
+    └── test-service.yaml       # Telemetry service deployment
 ```
 
 ## Telemetry Service
@@ -311,6 +308,10 @@ bazel run @gazelle//:gazelle
 bazel build //telemetry:image
 
 # Load image into Docker
+# ARM64 （Apple Silicon）
+bazel run //telemetry:image_load_arm64
+
+# AMD64
 bazel run //telemetry:image_load
 
 # Push image to registry
@@ -347,7 +348,9 @@ bazel run //telemetry:telemetry
 
 ### Deploy to Kubernetes
 
-See [Quick Start](#quick-start-zero-to-hero) for the complete zero-to-hero guide.
+```bash
+kubectl apply -f k8s/
+```
 
 ## Adding Dependencies
 
@@ -365,283 +368,351 @@ See [Quick Start](#quick-start-zero-to-hero) for the complete zero-to-hero guide
 
 3. If it's a new top-level dependency, add it to `use_repo()` in `MODULE.bazel`
 
-## Local Development with Kong
+## Gateway & JWT Troubleshooting
 
-Complete guide to running Kong API Gateway from scratch.
+### Understanding JWT Validation
 
-### Prerequisites
+Three URLs must align for JWT validation to work:
 
-| Tool | Installation | Description |
-|------|-------------|-------------|
-| Docker | <https://docker.com> | Container runtime |
-| Minikube | `brew install minikube` | Local K8s cluster |
-| kubectl | `brew install kubectl` | K8s CLI |
-| Helm | `brew install helm` | K8s package manager |
+1. **Token Issuer** - Written to JWT `iss` claim by Keycloak
+   - Controlled by `KC_HOSTNAME` + `KC_HOSTNAME_PORT` env vars
+   - Mismatch error: `"Jwt issuer is not configured"`
 
-### Quick Start (Zero to Hero)
+2. **SecurityPolicy Issuer** - Gateway validates token against this
+   - Must **exactly match** Token Issuer (including port)
 
-Complete setup from scratch:
+3. **JWKS URI** - Gateway fetches public keys to verify signature
+   - Gateway accesses Keycloak via K8s Service
+   - Must use **Service port** (not Pod port)
+   - Wrong port error: `"Jwks remote fetch is failed"`
 
-```bash
-# 1. Start Minikube
-minikube start --cpus=4 --memory=8192 --driver=docker
+**Pod vs Service Port:**
 
-# 2. Install Gateway API CRDs
-kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.4.1/standard-install.yaml
+- `port-forward pod/xxx 8080` → Pod internal port
+- `port-forward svc/xxx 80` → Service port (maps to Pod 8080)
+- In-cluster access (Gateway) → Must use Service port (80)
 
-# 3. Install Kong Gateway
-helm repo add kong https://charts.konghq.com && helm repo update
-helm install kong kong/ingress -n kong --create-namespace -f k8s/values.yaml
-
-# 4. Wait for Kong to be ready
-kubectl wait --for=condition=Ready pod -l app.kubernetes.io/component=app -n kong --timeout=120s
-
-# 5. Deploy Redis (for rate limiting)
-kubectl apply -f k8s/redis.yaml
-kubectl wait --for=condition=Ready pod -l app=redis -n redis --timeout=60s
-
-# 6. Deploy Kafka
-kubectl apply -f k8s/kafka.yaml
-kubectl wait --for=condition=Ready pod -l app=kafka -n kafka --timeout=120s
-
-# 7. Deploy Gateway API routes and plugins
-kubectl apply -f k8s/gateway-api-demo.yaml
-kubectl apply -f k8s/rate-limit-plugin.yaml
-
-# 8. Build and load telemetry service image
-bazel run //telemetry:image_load
-minikube image load telemetry:latest
-
-# 9. Deploy telemetry service
-kubectl apply -f k8s/test-service.yaml
-
-# 10. Get Kong URL
-export KONG_URL="http://$(minikube ip):$(kubectl get svc kong-gateway-proxy -n kong -o jsonpath='{.spec.ports[0].nodePort}')"
-echo $KONG_URL
-
-# 11. Test
-curl -X POST $KONG_URL/track \
-  -H "Content-Type: application/json" \
-  -d '[{"container_id":"TEST123","lat":51.9,"lon":4.4,"timestamp":"2024-01-15T10:30:00Z"}]'
-```
-
-### Accessing Kong
-
-Kong runs inside Minikube. There are two ways to access it:
-
-**Option A: NodePort (Recommended)**
-
-NodePort is recommended for local development because:
-
-- No sudo required - binds to high ports (30000-32767) instead of privileged port 80
-- No extra terminal - `minikube tunnel` must run in foreground
-- More stable - tunnel can disconnect or require re-authentication
-- Simpler - one command to get the URL, no background process needed
-
-```bash
-# Get the access URL
-KONG_URL="http://$(minikube ip):$(kubectl get svc kong-gateway-proxy -n kong -o jsonpath='{.spec.ports[0].nodePort}')"
-echo $KONG_URL
-
-# Test
-curl -i $KONG_URL
-```
-
-**Option B: Minikube Tunnel**
-
-Use this if you need standard ports (80/443):
-
-```bash
-# Run in a separate terminal (requires sudo to bind port 80)
-sudo minikube tunnel
-
-# Test
-curl -i http://127.0.0.1
-```
-
-### Verify Kong is Running
-
-```bash
-# Expected: 404 + "no Route matched" (normal - Kong is running but no routes configured)
-curl -i $KONG_URL
-
-# Check pod status (should show Running)
-kubectl get pods -n kong
-
-# Check Gateway resources
-kubectl get gateway,httproute -n kong
-```
-
-### Test Routing
-
-```bash
-# Deploy telemetry service
-kubectl apply -f k8s/test-service.yaml
-
-# Test telemetry endpoint (POST /track)
-curl -X POST $KONG_URL/track \
-  -H "Content-Type: application/json" \
-  -d '[{"container_id":"TEST123","lat":51.9,"lon":4.4,"timestamp":"2024-01-15T10:30:00Z"}]'
-
-# Test rate limiting (6th request should return 429)
-for i in {1..10}; do
-  curl -s -o /dev/null -w "%{http_code} " -X POST $KONG_URL/track \
-    -H "Content-Type: application/json" \
-    -d '[{"container_id":"TEST","lat":0,"lon":0,"timestamp":"2024-01-01T00:00:00Z"}]'
-done
-echo
-```
-
-### Common Commands
-
-```bash
-# View all Kong resources
-kubectl get all -n kong
-
-# View Kong logs
-kubectl logs -f deployment/kong-gateway -n kong
-
-# Enter Kong pod for debugging
-kubectl exec -it deployment/kong-gateway -n kong -- /bin/sh
-
-# Restart Kong
-kubectl rollout restart deployment/kong-gateway -n kong
-
-# Clean up
-kubectl delete namespace kong
-minikube stop
-```
-
-### Troubleshooting
-
-| Problem | Cause | Solution |
-|---------|-------|----------|
-| Pod status `Pending` | Insufficient resources | `minikube start --cpus=4 --memory=8192` |
-| Pod status `CrashLoopBackOff` | Configuration error | `kubectl logs -n kong <pod-name>` |
-| `EXTERNAL-IP` shows `<pending>` | Minikube doesn't provision LB | Use NodePort or `minikube tunnel` |
-| `curl` connection refused | Port not exposed | Check `minikube ip` and NodePort |
-| Routes return 404 | HTTPRoute not configured | `kubectl get httproute -n kong` |
-
-## Gateway API
-
-Gateway API is the next-generation Kubernetes traffic management standard, replacing traditional Ingress.
-
-```
-GatewayClass → Gateway → HTTPRoute → Service
-     ↓            ↓          ↓           ↓
- Implementation  Listener   Routing     Backend
-                 Entry      Rules       Service
-```
-
-### Verification
-
-```bash
-# Check status
-kubectl get gatewayclass
-kubectl get gateway -n kong
-kubectl get httproute -n kong
-
-# Test with port-forward
-kubectl port-forward svc/kong-gateway-proxy -n kong 8080:80
-
-# Unauthenticated route
-curl -H "Host: admin.local" http://localhost:8080/status
-
-# Authenticated route (returns 401)
-curl -H "Host: admin-secure.local" http://localhost:8080/status
-```
-
-### Resource Reference
-
-| Resource | Purpose |
-|----------|---------|
-| `GatewayClass` | Declares Kong as the Gateway implementation |
-| `Gateway` | Defines listener ports (port 80 entry point) |
-| `HTTPRoute` | Routing rules (host → service mapping) |
-| `KongPlugin` | Kong extensions (auth, rate limiting, etc.) |
-
-### Registering a Service
-
-Create an `HTTPRoute` to route traffic to your service:
+**Example Config:**
 
 ```yaml
-apiVersion: gateway.networking.k8s.io/v1
-kind: HTTPRoute
-metadata:
-  name: my-service-route
-  namespace: kong
+# Keycloak Helm values
+- name: KC_HOSTNAME
+  value: "keycloak-keycloakx-http.app.svc.cluster.local"
+- name: KC_HOSTNAME_PORT
+  value: "80"  # Service port, not Pod port
+
+# SecurityPolicy
+issuer: http://keycloak-keycloakx-http.app.svc.cluster.local/auth/realms/myrealm
+remoteJWKS:
+  uri: http://keycloak-keycloakx-http.app.svc.cluster.local/auth/realms/myrealm/protocol/openid-connect/certs
+```
+
+---
+
+### JWKS Fetch Failed
+
+**Symptom:**
+```
+[warning][jwt] Jwks async fetching url=http://keycloak-keycloakx-http.app.svc.cluster.local:80/realms/myrealm/protocol/openid-connect/certs: failed
+```
+
+**Possible Causes:**
+
+| Cause | Solution |
+|-------|----------|
+| Wrong Keycloak path | Keycloak v23+ uses `/realms/...`, older versions use `/auth/realms/...`. Check with `curl` |
+| Config not applied | Run `kubectl apply -f infra/gateway/security-policy.yaml -n app` |
+| Gateway needs restart | `kubectl delete pod -n app -l gateway.envoyproxy.io/owning-gateway-name=gateway` |
+
+**Diagnostic:**
+```bash
+# Test JWKS endpoint from inside cluster
+kubectl run curl-test --rm -it --image=curlimages/curl --restart=Never -n app -- \
+  curl -v http://keycloak-keycloakx-http.app.svc.cluster.local:80/auth/realms/myrealm/protocol/openid-connect/certs
+```
+
+---
+
+### JWT Issuer Not Configured (401 Unauthorized)
+
+**Symptom:**
+```
+HTTP/1.1 401 Unauthorized
+www-authenticate: Bearer realm="http://localhost/", error="invalid_token"
+Jwt issuer is not configured
+```
+
+**Root Cause:** Token's `iss` claim doesn't match SecurityPolicy's `issuer` field.
+
+**Diagnostic - Decode token to find actual issuer:**
+```bash
+TOKEN=$(curl -s -X POST "http://localhost:8080/auth/realms/myrealm/protocol/openid-connect/token" \
+  -d "grant_type=password&client_id=myclient&username=myuser&password=admin" | jq -r '.access_token')
+
+echo $TOKEN | cut -d'.' -f2 | base64 -d 2>/dev/null | jq '.iss'
+```
+
+**Fix:** Update `infra/gateway/security-policy.yaml` to match the token's issuer exactly:
+```yaml
+jwt:
+  providers:
+  - name: keycloak
+    issuer: http://keycloak-keycloakx-http.app.svc.cluster.local:8080/auth/realms/myrealm  # Must match token's iss
+    remoteJWKS:
+      uri: http://keycloak-keycloakx-http.app.svc.cluster.local:80/auth/realms/myrealm/protocol/openid-connect/certs
+```
+
+**Note:** The `issuer` URL often includes port `:8080` (Keycloak's internal port), while `remoteJWKS.uri` uses port `:80` (Service port).
+
+---
+
+### 500 Internal Server Error (Backend Not Found)
+
+**Symptom:**
+```
+HTTP/1.1 500 Internal Server Error
+```
+
+**Diagnostic:**
+```bash
+# Check if backend pods exist
+kubectl get pods -n app -l app=logistics
+
+# Check service endpoints
+kubectl get endpoints logistics-svc -n app
+```
+
+**Common Cause:** Service selector doesn't match Pod labels.
+
+```yaml
+# WRONG - selector and pod labels don't match
+apiVersion: v1
+kind: Service
 spec:
-  parentRefs:
-  - name: demo-gateway
-  hostnames:
-  - "my-service.local"
-  rules:
-  - matches:
-    - path:
-        type: PathPrefix
-        value: /
-    backendRefs:
-    - name: my-service
-      port: 80
+  selector:
+    app: logistics-deployment  # Looking for this label
+
+---
+apiVersion: apps/v1
+kind: Deployment
+spec:
+  template:
+    metadata:
+      labels:
+        app: logistics-pod      # But pods have this label
 ```
 
-**Adding plugins** (auth/rate limiting):
+**Fix:** Ensure Service selector matches Pod labels exactly.
 
-```yaml
-metadata:
-  annotations:
-    konghq.com/plugins: rate-limit,key-auth
+---
+
+### Deployment Selector Immutable Error
+
+**Symptom:**
+```
+The Deployment "xxx" is invalid: spec.selector: Invalid value: field is immutable
 ```
 
-## Rate Limiting
-
-Global rate limiting is applied to all traffic through Kong Gateway.
-
-### Architecture
-
-```
-Client Request → Kong Gateway → Redis (shared counter) → Backend Service
-                      ↓
-              Check: requests < 5/min?
-                      ↓
-              Yes: Allow → Backend
-              No:  Block → 429 Too Many Requests
+**Fix:** Delete and recreate the deployment:
+```bash
+kubectl delete deployment <name> -n app
+kubectl apply -f <manifest>.yaml -n app
 ```
 
-### Configuration
+## K8S structure
 
-| Setting | Value | Description |
-|---------|-------|-------------|
-| `minute` | 5 | Max requests per minute |
-| `policy` | redis | Shared counter across all Kong pods |
-| `redis_host` | redis.redis.svc.cluster.local | Redis service address |
+```mermaid
+flowchart TB
+    subgraph GatewayLayer["Gateway Layer"]
+        GC[GatewayClass: example-gateway-class]
+        GW[Gateway: example-gateway :80/:443]
+        GC --> GW
+    end
 
-### Deploy Rate Limiting
+    subgraph Routes["HTTPRoutes"]
+        R1[HTTPRoute: example-route - example.com]
+        R2[HTTPRoute: foo-route - foo.example.com/login]
+        R3[HTTPRoute: bar-route - bar.example.com]
+        R4[HTTPRoute: jwt-claim-routing]
+    end
+
+    subgraph Services["Services"]
+        S1[example-svc:8080]
+        S2[foo-svc:8080]
+        S3[bar-svc:8080]
+        S4[bar-canary-svc:8080]
+        S5[infra-backend-invalid:8080]
+    end
+
+    subgraph Deployments["Deployments"]
+        D1[example-backend]
+        D2[foo-backend]
+        D3[bar-backend]
+        D4[bar-canary-backend]
+    end
+
+    subgraph Policy["SecurityPolicy"]
+        SP[SecurityPolicy: jwt-example - JWT Validation]
+    end
+
+    %% Connections
+    GW --> R1
+    GW --> R2
+    GW --> R3
+    GW --> R4
+
+    R1 --> S1
+    R2 --> S2
+    R3 -- "header: env=canary" --> S4
+    R3 -- "default" --> S3
+
+    SP -.-> R4
+    R4 -- "x-name: John Doe" --> S2
+    R4 -- "x-name: Tom" --> S3
+    R4 -- "catch-all" --> S5
+
+    S1 --> D1
+    S2 --> D2
+    S3 --> D3
+    S4 --> D4
+```
+
+## Architecture
+
+```
+┌───────────────────────────────────────────────────────────────┐
+│                     /etc/hosts (本機)                          │
+│   127.0.0.1  auth.example.com                                 │
+│   127.0.0.1  logistics.example.com                            │
+└───────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌───────────────────────────────────────────────────────────────┐
+│            Minikube/Kind + port-forward :443                   │
+└───────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌───────────────────────────────────────────────────────────────┐
+│                     Envoy Gateway                              │
+│   ┌─────────────────────┬─────────────────────────┐           │
+│   │ auth.example.com    │ logistics.example.com   │           │
+│   │ → Keycloak          │ → Telemetry Service     │           │
+│   └─────────────────────┴─────────────────────────┘           │
+└───────────────────────────────────────────────────────────────┘
+```
+
+## Domain
+127.0.0.1    logistics.example.com
+127.0.0.1    keycloak-keycloakx-http.app.svc.cluster.local
+127.0.0.1    auth.example.com
+
+## Support
+macOS and linux
+
+## prerequisite
+
+0. [install minikube](https://minikube.sigs.k8s.io/docs/start/)
+1. [install docker](https://docs.docker.com/engine/install/)
+2. [install kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl)
+3. [install helm](https://helm.sh/docs/intro/install/)
+4. [install npm](https://docs.npmjs.com/downloading-and-installing-node-js-and-npm)
+
+
+## steps
+
+1. minikube start --cpus=4 --memory=8192 --driver=docker
+2. kubectl create namespace app
+
+### install kafka
+
+1. kubectl apply -f infra/kafka.yaml -n app
+2. kubectl wait --for=condition=Ready pod -l app=kafka -n app --timeout=120s
+3. kubectl apply -f https://strimzi.io/examples/latest/kafka/kafka-single-node.yaml -n app
+
+### install gateway
+
+1. helm install eg oci://docker.io/envoyproxy/gateway-helm --version v1.5.7 -n app
+2. kubectl apply -k infra/gateway/ -n app
+
+### install keycloak & postgres
+
+1. helm repo add codecentric https://codecentric.github.io/helm-charts -n app
+2. helm repo add cnpg https://cloudnative-pg.github.io/charts -n app
+3. helm repo update
+4. helm install keycloak codecentric/keycloakx --values ./infra/keycloakx/keycloak-server-values.yaml -n app
+5. helm upgrade --install cnpg \
+  --namespace app \
+  cnpg/cloudnative-pg
+6. kubectl apply -f infra/keycloakx/postgres-values.yaml -n app
+7. kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=keycloakx -n app --timeout=300s
+8. kubectl wait --for=condition=Ready cluster/keycloak-db -n app --timeout=120s
+9. kubectl wait --for=condition=available --timeout=300s deployment/cnpg-cloudnative-pg -n app
+10. make deploy-tls DOMAIN=app.example.com NAMESPACE=app SECRET_NAME=wildcard-cert
+11. open a new terminal and run `sudo minikube tunnel`
+12. go to: https://auth.example.com/auth Then follow official tutorial to create realm, client, user
+13. ./test-jwt.sh
+
+### Ref
+
+- https://github.com/cloudnative-pg/charts/tree/main/charts/cloudnative-pg
+- https://github.com/codecentric/helm-charts/tree/master/charts/keycloakx
+- https://www.keycloak.org/getting-started/getting-started-kube
+
+## Frontend
+
+React + TypeScript 前端应用，使用 Keycloak 进行身份认证。
+
+### 安装依赖
 
 ```bash
-# 1. Deploy Redis
-kubectl apply -f k8s/redis.yaml
-kubectl wait --for=condition=Ready pod -l app=redis -n redis --timeout=60s
-
-# 2. Apply global rate limit plugin
-kubectl apply -f k8s/rate-limit-plugin.yaml
-
-# 3. Verify (6th request should return 429)
-for i in {1..10}; do
-  curl -s -o /dev/null -w "%{http_code} " -X POST $KONG_URL/track \
-    -H "Content-Type: application/json" \
-    -d '[{"container_id":"TEST","lat":0,"lon":0,"timestamp":"2024-01-01T00:00:00Z"}]'
-done
-echo
+cd frontend
+npm install
 ```
 
-### Customizing Limits
+### Keycloak 配置
 
-Edit `k8s/rate-limit-plugin.yaml`:
+前端需要配置 `.env` 文件才能连接 Keycloak 进行授权。
 
-```yaml
-config:
-  minute: 60      # 60 requests per minute
-  hour: 1000      # 1000 requests per hour
-  policy: redis
+**1. 创建环境配置文件：**
+
+```bash
+cp frontend/.env.example frontend/.env
 ```
+
+**2. 编辑 `frontend/.env`：**
+
+```env
+VITE_KEYCLOAK_URL=https://auth.example.com/auth
+VITE_KEYCLOAK_REALM=myrealm
+VITE_KEYCLOAK_CLIENT_ID=myclient
+```
+
+| 变量 | 说明 |
+|------|------|
+| `VITE_KEYCLOAK_URL` | Keycloak 服务器地址（含 `/auth` 路径） |
+| `VITE_KEYCLOAK_REALM` | Keycloak Realm 名称 |
+| `VITE_KEYCLOAK_CLIENT_ID` | Keycloak Client ID |
+
+**3. Keycloak 端配置（必须）：**
+
+在 Keycloak Admin Console 中配置 Client：
+
+1. 登录 `https://auth.example.com/auth/admin`
+2. 选择 Realm → Clients → 点击你的 Client
+3. 设置以下字段：
+
+| 字段 | 值 |
+|------|-----|
+| Valid redirect URIs | `http://localhost:5173/*` |
+| Web origins | `http://localhost:5173` |
+
+> 未配置会导致 `Invalid parameter: redirect_uri` 错误
+
+### 启动开发服务器
+
+```bash
+cd frontend
+npm run dev
+```
+
+访问 `http://localhost:5173/`，会自动重定向到 Keycloak 登录页面。

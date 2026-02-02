@@ -17,8 +17,8 @@ use_repo(
 oci = use_extension("@rules_oci//oci:extensions.bzl", "oci")
 oci.pull(
     name = "distroless_static",
-    image = "gcr.io/distroless/static",
-    platforms = ["linux/amd64"],
+    image = "gcr.io/distroless/static-debian12",
+    platforms = ["linux/amd64", "linux/arm64/v8"],
     tag = "nonroot",
 )
-use_repo(oci, "distroless_static", "distroless_static_linux_amd64")
+use_repo(oci, "distroless_static", "distroless_static_linux_amd64", "distroless_static_linux_arm64_v8")

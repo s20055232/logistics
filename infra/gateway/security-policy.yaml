@@ -1,0 +1,125 @@
+# ============================================================
+# Frontend Route (無需 JWT)
+# ============================================================
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: frontend-route
+spec:
+  parentRefs:
+    - name: gateway
+      sectionName: https
+  hostnames:
+    - "logistics.example.com"
+  rules:
+    # 靜態資源不需要 JWT
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - kind: Service
+          name: frontend-svc
+          port: 80
+          weight: 1
+---
+# ============================================================
+# API Route (需要 JWT)
+# ============================================================
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: api-route
+spec:
+  parentRefs:
+    - name: gateway
+      sectionName: https
+  hostnames:
+    - "logistics.example.com"
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /api
+      backendRefs:
+        - kind: Service
+          name: logistics-svc
+          port: 8080
+          weight: 1
+---
+# ============================================================
+# JWT Security Policy (只保護 API)
+# ============================================================
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: SecurityPolicy
+metadata:
+  name: jwt
+spec:
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    name: api-route
+  jwt:
+    providers:
+    - name: keycloak
+      issuer: https://auth.example.com/auth/realms/myrealm
+      remoteJWKS:
+        uri: http://keycloak-keycloakx-http.app.svc.cluster.local/auth/realms/myrealm/protocol/openid-connect/certs
+    #   matches:
+    #     - headers:
+    #         - name: x-name
+    #           value: John Doe
+    # - backendRefs:
+    #     - kind: Service
+    #       name: bar-svc
+    #       port: 8080
+    #       weight: 1
+    #   matches:
+    #     - headers:
+    #         - name: x-name
+    #           value: Tom
+    # # catch all
+    # - backendRefs:
+    #     - kind: Service
+    #       name: infra-backend-invalid
+    #       port: 8080
+    #       weight: 1
+    #       group: "test"
+    #   matches:
+    #     - path:
+    #         type: PathPrefix
+    #         value: /
+    # - backendRefs:
+    #     - kind: Service
+    #       name: allen-svc
+    #       port: 8080
+    #       weight: 1
+    #       group: "test"
+    #   matches:
+    #     - path:
+    #         type: PathPrefix
+    #         value: /
+# ---
+# apiVersion: gateway.envoyproxy.io/v1alpha1
+# kind: SecurityPolicy
+# metadata:
+#   name: jwt
+# spec:
+#   targetRefs:
+#     - group: gateway.networking.k8s.io
+#       kind: HTTPRoute
+#       name: jwt-claim-routing
+#   jwt:
+#     providers:
+#       - name: jwt
+#         # recomputeRoute: true
+#         # claimToHeaders:
+#         #   - claim: sub
+#         #     header: x-sub
+#         #   - claim: admin
+#         #     header: x-admin
+#         #   - claim: name
+#         #     header: x-name
+#         remoteJWKS:
+#           uri: http://keycloak-keycloakx-http.app.svc.cluster.local:80/realms/myrealm/protocol/openid-connect/certs
+#           # http://keycloak.app.svc.cluster.local:8080/auth/realms/myrealm/protocol/openid-connect/certs

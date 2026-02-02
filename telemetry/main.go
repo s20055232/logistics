@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -12,18 +13,22 @@ import (
 )
 
 func main() {
-	brokers := strings.Split(getenv("KAFKA_BROKERS", "localhost:9092"), ",")
+	// write log to stdout/stderr and Kubernetes or Docker will capture it
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+		Level: slog.LevelInfo,
+	}))
+	slog.SetDefault(logger)
+	brokers := strings.Split(getenv("KAFKA_BROKERS", "kafka.app.svc.cluster.local:9092"), ",")
 	topic := getenv("KAFKA_TOPIC", "container.telemetry")
 	addr := getenv("LISTEN_ADDR", ":8080")
 
-	producer := NewProducer(brokers, topic)
+	producer := NewKafkaProducer(brokers, topic)
 	defer producer.Close()
 
 	handler := NewHandler(producer)
 
 	mux := http.NewServeMux()
-	mux.Handle("/track", handler)
-
+	mux.Handle("/api/track", handler)
 	srv := &http.Server{
 		Addr:         addr,
 		Handler:      mux,
@@ -44,13 +49,13 @@ func main() {
 		close(done)
 	}()
 
-	log.Printf("telemetry service listening on %s", addr)
+	slog.Info("telemetry service listening", "addr", addr)
 	if err := srv.ListenAndServe(); err != http.ErrServerClosed {
 		log.Fatal(err)
 	}
 
 	<-done
-	log.Println("shutdown complete")
+	slog.Info("shutdown complete")
 }
 
 func getenv(key, fallback string) string {

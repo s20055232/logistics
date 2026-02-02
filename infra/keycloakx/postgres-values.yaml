@@ -1,0 +1,26 @@
+# CNPG 會自動建立 <cluster-name>-rw service 供讀寫連線
+apiVersion: v1
+kind: Secret
+metadata:
+  name: keycloak-db-secret
+  namespace: app
+type: kubernetes.io/basic-auth
+stringData:
+  username: keycloak
+  password: keycloak-db-password
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: keycloak-db
+  namespace: app
+spec:
+  instances: 1
+  bootstrap:
+    initdb:
+      database: keycloak
+      owner: keycloak
+      secret:
+        name: keycloak-db-secret
+  storage:
+    size: 1Gi

@@ -9,26 +9,27 @@ import (
 )
 
 // Producer writes TrackPoints to Kafka in batches.
-type Producer struct {
+type KafkaProducer struct {
 	writer *kafka.Writer
 }
 
 // NewProducer creates a producer for the given topic.
-func NewProducer(brokers []string, topic string) *Producer {
+func NewKafkaProducer(brokers []string, topic string) *KafkaProducer {
 	w := &kafka.Writer{
-		Addr:         kafka.TCP(brokers...),
-		Topic:        topic,
-		Balancer:     &kafka.LeastBytes{},
-		BatchSize:    100,
-		BatchTimeout: 10 * time.Millisecond,
-		Async:        true,
-		RequiredAcks: kafka.RequireOne,
+		Addr:                   kafka.TCP(brokers...),
+		Topic:                  topic,
+		Balancer:               &kafka.LeastBytes{},
+		BatchSize:              100,
+		BatchTimeout:           10 * time.Millisecond,
+		Async:                  true,
+		RequiredAcks:           kafka.RequireOne,
+		AllowAutoTopicCreation: true,
 	}
-	return &Producer{writer: w}
+	return &KafkaProducer{writer: w}
 }
 
 // Write sends a TrackPoint to Kafka.
-func (p *Producer) Write(ctx context.Context, tp TrackPoint) error {
+func (p *KafkaProducer) Write(ctx context.Context, tp TrackPoint) error {
 	data, err := json.Marshal(tp)
 	if err != nil {
 		return err
@@ -40,6 +41,6 @@ func (p *Producer) Write(ctx context.Context, tp TrackPoint) error {
 }
 
 // Close flushes pending messages and closes the connection.
-func (p *Producer) Close() error {
+func (p *KafkaProducer) Close() error {
 	return p.writer.Close()
 }

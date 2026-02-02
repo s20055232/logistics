@@ -760,7 +760,7 @@
     "@@rules_oci~//oci:extensions.bzl%oci": {
       "general": {
         "bzlTransitiveDigest": "nWwp7/pJdtRc99uMaz5w9DbhuLm5eix2oiWVJA6xxU0=",
-        "usagesDigest": "BPoI3H/I7+W3Ks/N3ppDsgG3V6dWXbtdx2Y1qkJufd8=",
+        "usagesDigest": "bo0KleCD4RI1ymWL9uU03A2Clb/z3wIvD58tFiUQIKQ=",
         "recordedFileInputs": {},
         "recordedDirentsInputs": {},
         "envVariables": {},
@@ -772,10 +772,24 @@
               "www_authenticate_challenges": {},
               "scheme": "https",
               "registry": "gcr.io",
-              "repository": "distroless/static",
+              "repository": "distroless/static-debian12",
               "identifier": "nonroot",
               "platform": "linux/amd64",
               "target_name": "distroless_static_linux_amd64",
+              "bazel_tags": []
+            }
+          },
+          "distroless_static_linux_arm64_v8": {
+            "bzlFile": "@@rules_oci~//oci/private:pull.bzl",
+            "ruleClassName": "oci_pull",
+            "attributes": {
+              "www_authenticate_challenges": {},
+              "scheme": "https",
+              "registry": "gcr.io",
+              "repository": "distroless/static-debian12",
+              "identifier": "nonroot",
+              "platform": "linux/arm64/v8",
+              "target_name": "distroless_static_linux_arm64_v8",
               "bazel_tags": []
             }
           },
@@ -787,10 +801,11 @@
               "www_authenticate_challenges": {},
               "scheme": "https",
               "registry": "gcr.io",
-              "repository": "distroless/static",
+              "repository": "distroless/static-debian12",
               "identifier": "nonroot",
               "platforms": {
-                "@@platforms//cpu:x86_64": "@distroless_static_linux_amd64"
+                "@@platforms//cpu:x86_64": "@distroless_static_linux_amd64",
+                "@@platforms//cpu:arm64": "@distroless_static_linux_arm64_v8"
               },
               "bzlmod_repository": "distroless_static",
               "reproducible": true
@@ -930,7 +945,8 @@
         "moduleExtensionMetadata": {
           "explicitRootModuleDirectDeps": [
             "distroless_static",
-            "distroless_static_linux_amd64"
+            "distroless_static_linux_amd64",
+            "distroless_static_linux_arm64_v8"
           ],
           "explicitRootModuleDirectDevDeps": [],
           "useAllRepos": "NO",

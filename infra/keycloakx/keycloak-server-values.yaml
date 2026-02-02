@@ -1,0 +1,35 @@
+command:
+  - "/opt/keycloak/bin/kc.sh"
+  - "--verbose"
+  - "start"
+  - "--http-port=8080"
+  - "--hostname"
+  - "https://auth.example.com/auth"
+
+# - name: KC_HOSTNAME_PORT
+#   value: "443"
+# - name: KC_HOSTNAME_STRICT_HTTPS
+#   value: "true"  # 強制 HTTPS，讓 issuer 使用 https://
+# - name: KC_PROXY
+#   value: "edge"  # 告訴 Keycloak 在 reverse proxy 後
+extraEnv: |
+  - name: KC_HOSTNAME
+    value: "auth.example.com"
+  - name: KC_BOOTSTRAP_ADMIN_USERNAME
+    value: admin
+  - name: KC_BOOTSTRAP_ADMIN_PASSWORD
+    value: admin
+  - name: JAVA_OPTS_APPEND
+    value: >-
+      -XX:MaxRAMPercentage=50.0
+
+dbchecker:
+  enabled: true
+
+database:
+  vendor: postgres
+  hostname: keycloak-db-rw
+  port: 5432
+  username: keycloak
+  password: keycloak-db-password
+  database: keycloak

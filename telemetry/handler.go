@@ -1,17 +1,30 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
+	"log/slog"
 	"net/http"
 )
 
+func writeError(w http.ResponseWriter, code int, msg string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(code)
+	json.NewEncoder(w).Encode(map[string]string{"error": msg})
+}
+
+type Producer interface {
+	Write(ctx context.Context, tp TrackPoint) error
+	Close() error
+}
+
 // Handler processes incoming GPS data.
 type Handler struct {
-	producer *Producer
+	producer Producer
 }
 
 // NewHandler creates a handler with the given producer.
-func NewHandler(p *Producer) *Handler {
+func NewHandler(p Producer) *Handler {
 	return &Handler{producer: p}
 }
 
@@ -23,6 +36,8 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Use slice instead of single TrackPoint for batch processing:
+	// GPS devices buffer points locally and upload in batches (real-world behavior)
 	var points []TrackPoint
 	if err := json.NewDecoder(r.Body).Decode(&points); err != nil {
 		http.Error(w, "invalid JSON: expected array", http.StatusBadRequest)
@@ -35,7 +50,12 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if err := h.producer.Write(r.Context(), tp); err != nil {
-			http.Error(w, "write failed", http.StatusInternalServerError)
+			slog.Error("kafka write failed",
+				"error", err,
+				"container_id", tp.ContainerID,
+				"request_id", r.Header.Get("X-Request-ID"),
+			)
+			writeError(w, http.StatusServiceUnavailable, "service temporarily unavailable")
 			return
 		}
 	}
