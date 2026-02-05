@@ -1,4 +1,0 @@
-load("@gazelle//:def.bzl", "gazelle")
-
-# gazelle:prefix github.com/lai/logistics
-gazelle(name = "gazelle")
