@@ -1,0 +1,25 @@
+# a required field in resource manifests that specifies which version of the Kubernetes API you're using to create that object
+# apiVersion is the routing key that tells Kubernetes which operator owns this resource.
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: telemetry-timescaledb
+  namespace: app
+spec:
+  instances: 1
+  imageName: timescaledb-postgis-uuidv7:17
+  imagePullPolicy: Never
+  bootstrap:
+    initdb:
+      postInitTemplateSQL:
+        - CREATE EXTENSION timescaledb;
+        - CREATE EXTENSION pg_uuidv7;
+        - CREATE EXTENSION postgis;
+        - CREATE EXTENSION postgis_topology;
+        - CREATE EXTENSION fuzzystrmatch;
+        - CREATE EXTENSION postgis_tiger_geocoder;
+  postgresql:
+    shared_preload_libraries:
+      - timescaledb
+  storage:
+    size: 1Gi

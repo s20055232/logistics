@@ -1,0 +1,31 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: consumer-migrate-${VERSION}  # Unique per deployment
+  namespace: app
+spec:
+  ttlSecondsAfterFinished: 300
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+      - name: migrate
+        image: migrate/migrate:v4.17.0
+        args:
+          - "-path=/migrations"
+          - "-database=$(DATABASE_URL)"
+          - "up"
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: telemetry-timescaledb-app
+              key: uri
+        volumeMounts:
+        - name: migrations
+          mountPath: /migrations
+      volumes:
+      - name: migrations
+        configMap:
+          name: consumer-migrations
