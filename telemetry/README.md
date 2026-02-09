@@ -46,16 +46,49 @@ Environment variables:
 
 ```bash
 # Build
-bazel build //:telemetry
+make build
 
-# Run
-KAFKA_BROKERS=localhost:9092 bazel run //:telemetry
+# Run locally
+KAFKA_BROKERS=localhost:9092 ./telemetry
 
 # Test endpoint
 curl -X POST http://localhost:8080/track \
   -H "Content-Type: application/json" \
   -d '[{"container_id":"C001","lat":25.033,"lon":121.565,"timestamp":"2026-01-23T10:00:00Z","speed":5.2}]'
 ```
+
+## Development
+
+```bash
+# Run unit tests
+make test
+
+# Run tests with race detector
+make test-race
+
+# Run integration tests (requires Keycloak + Gateway running)
+export KEYCLOAK_USERNAME=myuser
+export KEYCLOAK_PASSWORD=myuser
+make test-integration
+
+# Run load tests with web UI (http://localhost:8089)
+make test-load
+
+# Run load tests headless (for CI)
+make test-load-headless LOCUST_USERS=100 LOCUST_RUN_TIME=120s
+```
+
+### Load Test Configuration
+
+| Variable            | Default                    | Description           |
+| ------------------- | -------------------------- | --------------------- |
+| `KEYCLOAK_URL`      | `https://localhost:8443`   | Keycloak server       |
+| `GATEWAY_URL`       | `https://localhost:8080`   | API gateway           |
+| `KEYCLOAK_USERNAME` | (required)                 | Test user             |
+| `KEYCLOAK_PASSWORD` | (required)                 | Test password         |
+| `LOCUST_USERS`      | `50`                       | Concurrent users      |
+| `LOCUST_SPAWN_RATE` | `10`                       | Users spawned/second  |
+| `LOCUST_RUN_TIME`   | `60s`                      | Test duration         |
 
 ## Performance
 

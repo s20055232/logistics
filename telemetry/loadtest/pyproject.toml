@@ -1,0 +1,11 @@
+[project]
+name = "telemetry-loadtest"
+version = "0.1.0"
+description = "Locust load tests for telemetry API"
+requires-python = ">=3.13"
+dependencies = [
+    "locust>=2.32.0",
+]
+
+[tool.uv]
+dev-dependencies = []
