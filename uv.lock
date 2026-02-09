@@ -136,14 +136,12 @@ source = { virtual = "." }
 dependencies = [
     { name = "mkdocs" },
     { name = "mkdocs-material" },
-    { name = "mkdocs-simple-blog" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "mkdocs", specifier = ">=1.6.1" },
     { name = "mkdocs-material", specifier = ">=9.7.1" },
-    { name = "mkdocs-simple-blog", specifier = ">=0.3.0" },
 ]
 
 [[package]]
@@ -283,18 +281,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/79/9b/9b4c96d6593b2a541e1cb8b34899a6d021d208bb357042823d4d2cabdbe7/mkdocs_material_extensions-1.3.1.tar.gz", hash = "sha256:10c9511cea88f568257f960358a467d12b970e1f7b2c0e5fb2bb48cab1928443", size = 11847, upload_time = "2023-11-22T19:09:45.208Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/5b/54/662a4743aa81d9582ee9339d4ffa3c8fd40a4965e033d77b9da9774d3960/mkdocs_material_extensions-1.3.1-py3-none-any.whl", hash = "sha256:adff8b62700b25cb77b53358dad940f3ef973dd6db797907c49e3c2ef3ab4e31", size = 8728, upload_time = "2023-11-22T19:09:43.465Z" },
-]
-
-[[package]]
-name = "mkdocs-simple-blog"
-version = "0.3.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "mkdocs" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/2d/24/403eee0efd4dd7198d382c4b1a0888ee4890bfee3c2688d755cc06a86f6d/mkdocs_simple_blog-0.3.0.tar.gz", hash = "sha256:f2d154a51a00d6016b198c512aeb1bd1ebfe66e16efe9a63afcf33af9ab259a2", size = 273357, upload_time = "2025-12-20T06:03:56.807Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/57/8b/a281042b8504311dca40ee198b1dc1c5af4e0f9949e0ed4c0a4d951c3397/mkdocs_simple_blog-0.3.0-py3-none-any.whl", hash = "sha256:40306573ede01e848f6d148c0f2233e0de79aae8e41ac6122bf892a3d539b5d4", size = 282056, upload_time = "2025-12-20T06:03:55.464Z" },
 ]
 
 [[package]]
