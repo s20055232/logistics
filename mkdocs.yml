@@ -1,0 +1,51 @@
+site_name: RouteMaster NL Documentation
+site_description: Cloud-native logistics platform for tracking shipping containers
+site_url: https://s20055232.github.io/logistics/
+repo_url: https://github.com/s20055232/logistics
+repo_name: s20055232/logistics
+
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+
+nav:
+  - Home: index.md
+  - Getting Started: getting-started.md
+  - Services:
+    - services/telemetry.md
+    - services/consumer.md
+  - Guides:
+    - guides/tls-guide.md
+    - guides/minikube-quickstart.md
+  - Reference:
+    - reference/prd.md
+
+markdown_extensions:
+  - tables
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - attr_list
+  - md_in_html
