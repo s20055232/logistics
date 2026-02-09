@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
-	consumer "github.com/lai/logistics/consumer/db"
+	"github.com/lai/logistics/consumer/db"
 	"github.com/lai/logistics/consumer/service"
 )
 
@@ -38,7 +38,7 @@ func main() {
 		os.Exit(1)
 	}
 	defer pool.Close()
-	queries := consumer.New(pool)
+	queries := db.New(pool)
 
 	// WebSocket hub
 	hub := service.NewHub()
