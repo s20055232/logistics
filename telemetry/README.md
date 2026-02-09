@@ -30,7 +30,7 @@ POST JSON array to `/track`:
 | `lat`          | float64 | Latitude, -90 to 90 (required)           |
 | `lon`          | float64 | Longitude, -180 to 180 (required)        |
 | `timestamp`    | RFC3339 | GPS measurement time (required)          |
-| `speed`        | float64 | Speed in m/s, >= 0 (required)            |
+| `speed`        | float64 | Speed in m/s, >= 0 (optional, default 0) |
 
 ## Configuration
 

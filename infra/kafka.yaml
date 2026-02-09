@@ -76,6 +76,8 @@ spec:
               value: "/tmp/kraft-combined-logs"
             - name: CLUSTER_ID
               value: "MkU3OEVBNTcwNTJENDM2Qk"
+            - name: KAFKA_NUM_PARTITIONS
+              value: "3"
           resources:
             requests:
               memory: "512Mi"

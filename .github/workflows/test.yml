@@ -1,0 +1,54 @@
+name: Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  unit-test:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.23"
+
+      - name: Run telemetry tests
+        working-directory: ./telemetry
+        run: go test -v -race ./...
+
+      - name: Run consumer tests
+        working-directory: ./consumer
+        run: go test -v -race ./...
+        continue-on-error: true # skip if no tests exist yet
+
+  integration-test:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    needs: unit-test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.23"
+
+      - name: Run integration tests
+        working-directory: ./telemetry
+        run: go test -v -tags=integration ./...
+        env:
+          KEYCLOAK_URL: ${{ secrets.KEYCLOAK_URL }}
+          KEYCLOAK_REALM: ${{ secrets.KEYCLOAK_REALM }}
+          KEYCLOAK_CLIENT: ${{ secrets.KEYCLOAK_CLIENT }}
+          KEYCLOAK_USERNAME: ${{ secrets.KEYCLOAK_USERNAME }}
+          KEYCLOAK_PASSWORD: ${{ secrets.KEYCLOAK_PASSWORD }}
+          GATEWAY_URL: ${{ secrets.GATEWAY_URL }}

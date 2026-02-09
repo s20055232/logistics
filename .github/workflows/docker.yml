@@ -1,0 +1,19 @@
+name: Build and Push
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build telemetry
+        run: docker build -f telemetry/Dockerfile -t telemetry:latest .
+
+      - name: Build consumer
+        run: docker build -f consumer/Dockerfile -t consumer:latest .
