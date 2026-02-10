@@ -8,36 +8,7 @@ A cloud-native, event-driven logistics platform for tracking shipping containers
 
 ## Architecture Overview
 
-```text
-      ┌─────────────────────────────────────────────────────────┐
-      │                      Envoy Gateway                      │
-      │  auth.example.com → Keycloak                            │
-      │  logistics.example.com → Telemetry Service / Nginx      │
-      └─────────────────────────────────────────────────────────┘
-                  │              │              │
-                  ▼              ▼              ▼
-          ┌───────────┐  ┌─────────────┐  ┌─────────────┐
-          │ Keycloak  │  │  Telemetry  │  │    Nginx    │
-          │  (auth)   │  │   Service   │  │  (frontend) │
-          └───────────┘  └──────┬──────┘  └─────────────┘
-                               │
-                               ▼
-                     ┌─────────────────┐
-                     │      Kafka      │
-                     └────────┬────────┘
-                              │
-                 ┌────────────┴────────────┐
-                 ▼                         ▼
-         ┌─────────────────┐       ┌───────────────┐
-         │   Rule Engine   │       │    Consumer   │
-         └───────┬─────────┘       └───────┬───────┘
-                 │                         │
-                 └────────────┬────────────┘
-                              ▼
-                    ┌─────────────────┐
-                    │   TimescaleDB   │
-                    └─────────────────┘
-```
+![system architecture](./assets/system_design.png)
 
 ## Getting Started
 

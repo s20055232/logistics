@@ -4,48 +4,7 @@ A cloud-native, event-driven logistics platform for tracking shipping containers
 
 ## Architecture
 
-```text
-      ┌─────────────────────────────────────────────────────────┐
-      │                      Envoy Gateway                      │
-      │  auth.example.com → Keycloak                            │
-      │  logistics.example.com → Telemetry Service / Nginx      │
-      └─────────────────────────────────────────────────────────┘
-                  │              │              │
-                  │              │              │
-                  │              │              │         
-                  ▼              ▼              ▼
-          ┌───────────┐  ┌─────────────┐  ┌─────────────┐
-          │ Keycloak  │  │  Telemetry  │  │    Nginx    │
-          │  (auth)   │  │   Service   │  │  (frontend) │
-          └───────────┘  └──────┬──────┘  └─────────────┘
-                                │                ▲
-  GPS Device ─POST /api/track───┘                │
-                                │                │ WebSocket
-                                │                │
-                                ▼                │
-                      ┌─────────────────┐        │
-                      │      Kafka      │        │
-                      │ container.telem │        │
-                      └────────┬────────┘        │
-                               │ read            │
-                  ┌────────────┴────────────┐    │
-                  ▼                         ▼    │
-          ┌─────────────────┐       ┌───────────────┐
-          │   Rule Engine   │       │    Consumer   │
-          │  (Geofencing)   │       │    Service    │
-          └───────┬─────────┘       └───────┬───────┘
-                  │                         │ batch insert
-                  │ query zones             ▼
-                  │               ┌─────────────────┐
-                  └──────────────▶│   TimescaleDB   │
-                  │               │    (PostGIS)    │
-                  ▼               └─────────────────┘
-          ┌─────────────────┐              │
-          │  Notification   │──────────────┘
-          │     Service     │
-          └─────────────────┘
-            (Email/SMS/Push)
-```
+![system architecture](./assets/system_design.png)
 
 **Local Development Setup:**
 
