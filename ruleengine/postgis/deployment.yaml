@@ -1,0 +1,16 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: ruleengine-db
+  namespace: app
+spec:
+  instances: 1
+  imageName: postgis-uuidv7:17
+  imagePullPolicy: Never
+  bootstrap:
+    initdb:
+      postInitTemplateSQL:
+        - CREATE EXTENSION pg_uuidv7;
+        - CREATE EXTENSION postgis;
+  storage:
+    size: 1Gi

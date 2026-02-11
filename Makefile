@@ -5,6 +5,7 @@ include makefiles/timescaledb.mk
 include makefiles/telemetry.mk
 include makefiles/frontend.mk
 include makefiles/kafka.mk
+include makefiles/ruleengine.mk
 help:
 	@echo "可用的命令模組:"
 	@echo ""
@@ -22,6 +23,9 @@ help:
 	@echo ""
 	@echo "Telemetry:"
 	@echo "  make help-telemetry     - Telemetry service build and test commands"
+	@echo ""
+	@echo "Rule Engine:"
+	@echo "  make help-ruleengine    - Rule engine service commands"
 	@echo ""
 	@echo "其他模組:"
 	@echo "  make help-docker        - Docker 相關命令"
@@ -77,6 +81,19 @@ redeploy-consumer:
 	kubectl wait --for=condition=Available deployment/consumer-deployment -n app --timeout=60s
 	@echo "=== 部署完成 ==="
 
+redeploy-ruleengine:
+	@echo "=== Delete existing deployment ==="
+	-kubectl delete -f ruleengine/deployment.yaml -n app
+	@echo "=== Remove old image from minikube ==="
+	-minikube image rm ruleengine:latest
+	@echo "=== Build image ==="
+	docker build -f ruleengine/Dockerfile -t ruleengine:latest ./ruleengine
+	@echo "=== Load image to minikube ==="
+	minikube image load ruleengine:latest
+	@echo "=== Deploy service ==="
+	kubectl apply -f ruleengine/deployment.yaml -n app
+	kubectl wait --for=condition=Available deployment/ruleengine-deployment -n app --timeout=60s
+	@echo "=== Deploy complete ==="
 
 # gen-tls:
 # 	openssl req -x509 -sha256 -nodes -days 365 -newkey rsa:2048 -subj '/O=example Inc./CN=example.com' -keyout example.com.key -out example.com.crt

@@ -1,0 +1,36 @@
+apiVersion: v1
+data:
+  000001_geofences.down.sql: |
+    DROP TABLE IF EXISTS geofences;
+  000001_geofences.up.sql: |
+    CREATE EXTENSION IF NOT EXISTS postgis;
+    CREATE EXTENSION IF NOT EXISTS pg_uuidv7;
+
+    CREATE TABLE IF NOT EXISTS geofences (
+        id UUID DEFAULT uuid_generate_v7() PRIMARY KEY,
+        name TEXT NOT NULL,
+        owner_id TEXT NOT NULL,
+        boundary GEOMETRY(POLYGON, 4326) NOT NULL,
+        enabled BOOLEAN NOT NULL DEFAULT TRUE,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    CREATE INDEX IF NOT EXISTS geofences_boundary_idx ON geofences USING GIST (boundary) WHERE enabled = TRUE;
+    CREATE INDEX IF NOT EXISTS geofences_owner_idx ON geofences (owner_id);
+  000002_geofence_states.down.sql: |
+    DROP TABLE IF EXISTS geofence_states;
+  000002_geofence_states.up.sql: |
+    CREATE TABLE IF NOT EXISTS geofence_states (
+        container_id TEXT NOT NULL,
+        geofence_id UUID NOT NULL REFERENCES geofences(id) ON DELETE CASCADE,
+        inside BOOLEAN NOT NULL DEFAULT FALSE,
+        updated_at TIMESTAMPTZ DEFAULT NOW(),
+        PRIMARY KEY (container_id, geofence_id)
+    );
+
+    CREATE INDEX IF NOT EXISTS geofence_states_geofence_id_idx ON geofence_states (geofence_id);
+kind: ConfigMap
+metadata:
+  name: ruleengine-migrations
+  namespace: app

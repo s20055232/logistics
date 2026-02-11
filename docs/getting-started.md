@@ -34,8 +34,8 @@ logistics/
 ├── docs/                # Documentation and diagrams
 ├── makefiles/           # Modular Makefile includes
 ├── .github/             # GitHub Actions workflows
-├── notification/        # (Planned) Alert notification service
-└── rule-engine/         # (Planned) Rule engine for geofencing
+├── ruleengine/          # Geofencing rule engine (Go, PostGIS, Kafka producer)
+└── notification/        # (Planned) Alert notification service
 ```
 
 ## Telemetry Service
@@ -303,7 +303,11 @@ flowchart TB
         K[Kafka: container.telemetry]
         CS[consumer-svc:8080]
         CD[consumer-deployment]
-        TS[(TimescaleDB)]
+        TS[(TimescaleDB - telemetry)]
+        RE[ruleengine-svc:8082]
+        RD[ruleengine-deployment]
+        RDB[(PostGIS - geofences)]
+        KE[Kafka: geofence.events]
     end
 
     %% Gateway connections
@@ -328,8 +332,12 @@ flowchart TB
     %% Data pipeline
     D2 -- "produce" --> K
     K -- "consume" --> CS
+    K -- "consume" --> RE
     CS --> CD
     CD --> TS
+    RE --> RD
+    RD --> RDB
+    RD -- "produce" --> KE
 ```
 
 ## Quick Start
@@ -451,9 +459,10 @@ export VERSION=$(git rev-parse --short HEAD)
 envsubst < consumer/migrate-jobs/migrate-job.yaml | kubectl apply -f -
 
 # Deploy services
-make redeploy-logistics   # Telemetry service
-make redeploy-consumer    # Consumer service
-make frontend-redeploy    # Frontend
+make redeploy-logistics    # Telemetry service
+make redeploy-consumer     # Consumer service
+make redeploy-ruleengine   # Rule engine service
+make frontend-redeploy     # Frontend
 ```
 
 ### 8. Verify Installation
