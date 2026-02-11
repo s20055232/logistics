@@ -35,7 +35,7 @@ logistics/
 ├── makefiles/           # Modular Makefile includes
 ├── .github/             # GitHub Actions workflows
 ├── ruleengine/          # Geofencing rule engine (Go, PostGIS, Kafka producer)
-└── notification/        # (Planned) Alert notification service
+└── notification/        # Email notification service (Go, nikoksr/notify, Gmail SMTP)
 ```
 
 ## Telemetry Service
@@ -308,6 +308,10 @@ flowchart TB
         RD[ruleengine-deployment]
         RDB[(PostGIS - geofences)]
         KE[Kafka: geofence.events]
+        NS[notification-svc:8083]
+        ND[notification-deployment]
+        NDB[(PostgreSQL - notification)]
+        EMAIL[Gmail SMTP]
     end
 
     %% Gateway connections
@@ -338,6 +342,10 @@ flowchart TB
     RE --> RD
     RD --> RDB
     RD -- "produce" --> KE
+    KE -- "consume" --> NS
+    NS --> ND
+    ND --> NDB
+    ND -- "send" --> EMAIL
 ```
 
 ## Quick Start
@@ -447,25 +455,79 @@ sudo minikube tunnel
    - **Web origins:** `https://logistics.example.com`
    ![Login Settings](./assets/login_setting.png)
 
-### 7. Deploy Services
+### 7. Deploy Databases
 
 ```bash
-# Deploy TimescaleDB
+# TimescaleDB (consumer service)
 kubectl apply -f consumer/timescaledb/deployment.yaml -n app
 
-# Run migrations
-kubectl apply -f consumer/migrate-jobs/migrations-configmap.yaml
+# PostGIS (ruleengine service)
+kubectl apply -f ruleengine/postgis/deployment.yaml -n app
+
+# PostgreSQL (notification service)
+kubectl apply -f notification/postgres/deployment.yaml -n app
+
+# Wait for all CNPG clusters to be ready
+kubectl wait --for=condition=Ready cluster/telemetry-timescaledb -n app --timeout=120s
+kubectl wait --for=condition=Ready cluster/ruleengine-db -n app --timeout=120s
+kubectl wait --for=condition=Ready cluster/notification-db -n app --timeout=120s
+```
+
+### 8. Run Database Migrations
+
+Each service uses [golang-migrate](https://github.com/golang-migrate/migrate) via a Kubernetes Job. The migration SQL files are stored in a ConfigMap, and the Job runs `migrate up` against the database.
+
+**How it works:**
+
+1. A ConfigMap holds the migration SQL files (generated from `db/migrations/`)
+2. A Job mounts the ConfigMap and runs the `migrate/migrate` image
+3. The Job reads `DATABASE_URL` from the CNPG-generated secret (`<cluster-name>-app`)
+4. The Job name includes a version tag (`${VERSION}`) so each run creates a new Job
+
+**Run migrations for all services:**
+
+```bash
 export VERSION=$(git rev-parse --short HEAD)
+
+# Consumer service
+kubectl apply -f consumer/migrate-jobs/ -n app
 envsubst < consumer/migrate-jobs/migrate-job.yaml | kubectl apply -f -
 
-# Deploy services
+# Ruleengine service
+kubectl apply -f ruleengine/migrate-jobs/ -n app
+envsubst < ruleengine/migrate-jobs/migrate-job.yaml | kubectl apply -f -
+
+# Notification service
+kubectl apply -f notification/migrate-jobs/ -n app
+envsubst < notification/migrate-jobs/migrate-job.yaml | kubectl apply -f -
+
+# Wait for all migrations to complete
+kubectl wait --for=condition=complete job/consumer-migrate-${VERSION} -n app --timeout=120s
+kubectl wait --for=condition=complete job/ruleengine-migrate-${VERSION} -n app --timeout=120s
+kubectl wait --for=condition=complete job/notification-migrate-${VERSION} -n app --timeout=120s
+```
+
+**To regenerate a ConfigMap after changing migration files:**
+
+```bash
+make notification-migrate-configmap   # or ruleengine-migrate-configmap
+```
+
+### 9. Deploy Services
+
+```bash
+# Create notification SMTP secret
+make notification-smtp-secret SMTP_USER=you@gmail.com SMTP_PASSWORD=your-app-password
+
+# Deploy all services
 make redeploy-logistics    # Telemetry service
 make redeploy-consumer     # Consumer service
 make redeploy-ruleengine   # Rule engine service
+make redeploy-notification # Notification service
 make frontend-redeploy     # Frontend
 ```
 
-### 8. Verify Installation
+### 10. Verify Installation
 
 ```bash
 # Check all pods are running
@@ -477,12 +539,8 @@ kubectl wait --for=condition=Ready pod -l app=kafka -n app --timeout=120s
 # Wait for Keycloak
 kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=keycloakx -n app --timeout=300s
 
-# Wait for PostgreSQL
-kubectl wait --for=condition=Ready cluster/keycloak-db -n app --timeout=120s
+# Wait for CNPG operator
 kubectl wait --for=condition=available deployment/cnpg-cloudnative-pg -n app --timeout=300s
-
-# Wait for migrations
-kubectl wait --for=condition=complete job/consumer-migrate-${VERSION} -n app --timeout=120s
 
 # Test JWT auth
 ./test-jwt.sh

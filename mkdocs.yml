@@ -33,6 +33,8 @@ nav:
   - Services:
     - services/telemetry.md
     - services/consumer.md
+    - services/ruleengine.md
+    - services/notification.md
   - Guides:
     - guides/tls-guide.md
     - guides/minikube-quickstart.md

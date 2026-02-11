@@ -6,6 +6,7 @@ include makefiles/telemetry.mk
 include makefiles/frontend.mk
 include makefiles/kafka.mk
 include makefiles/ruleengine.mk
+include makefiles/notification.mk
 help:
 	@echo "可用的命令模組:"
 	@echo ""
@@ -26,6 +27,9 @@ help:
 	@echo ""
 	@echo "Rule Engine:"
 	@echo "  make help-ruleengine    - Rule engine service commands"
+	@echo ""
+	@echo "Notification:"
+	@echo "  make help-notification  - Notification service commands"
 	@echo ""
 	@echo "其他模組:"
 	@echo "  make help-docker        - Docker 相關命令"
@@ -93,6 +97,20 @@ redeploy-ruleengine:
 	@echo "=== Deploy service ==="
 	kubectl apply -f ruleengine/deployment.yaml -n app
 	kubectl wait --for=condition=Available deployment/ruleengine-deployment -n app --timeout=60s
+	@echo "=== Deploy complete ==="
+
+redeploy-notification:
+	@echo "=== Delete existing deployment ==="
+	-kubectl delete -f notification/deployment.yaml -n app
+	@echo "=== Remove old image from minikube ==="
+	-minikube image rm notification:latest
+	@echo "=== Build image ==="
+	docker build -f notification/Dockerfile -t notification:latest ./notification
+	@echo "=== Load image to minikube ==="
+	minikube image load notification:latest
+	@echo "=== Deploy service ==="
+	kubectl apply -f notification/deployment.yaml -n app
+	kubectl wait --for=condition=Available deployment/notification-deployment -n app --timeout=60s
 	@echo "=== Deploy complete ==="
 
 # gen-tls:
